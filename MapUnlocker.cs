@@ -24,18 +24,21 @@ public class MapUnlocker : BaseUnityPlugin
     // map list index constants
     static readonly int ALL_MAPS = 0;
 
-    //
     private ConfigEntry<bool> debugMode;
 
-    //
+    // config entry to enable and disable reseting maps to the original map data when leaving
     private ConfigEntry<bool> resetMapsAfterLeaving;
 
-    //
+    private ConfigEntry<bool> hasQuill;
+
+    // Config entry to enable all maps at the start of a game
     private ConfigEntry<bool> unlockAllMapsAtStart;
+    // Config entry list to modify each entry with ease
     public ConfigEntry<bool>[] mapConfigs = new ConfigEntry<bool>[mapFields.Length];
 
     private bool hasStoredOriginalData = false;
 
+    // bool list to hold mapData for resets and saves 
     public bool[] originalMapData = new bool[mapFields.Length];
     public bool[] moddedMapData = new bool[mapFields.Length];
 
@@ -96,6 +99,7 @@ public class MapUnlocker : BaseUnityPlugin
     {
         debugMode = Config.Bind("Map Unlocker", "Debug mode", false, "Enables log messages for debugging purposes.");
         resetMapsAfterLeaving = Config.Bind("Map Unlocker", "Reset Maps after leaving", false, "Resets all maps to original state after leaving.");
+        hasQuill = Config.Bind("Map Unlocker", "Has Quill", false, "Enables the quill tool.");
         unlockAllMapsAtStart = Config.Bind("Map Unlocker", "Unlock All Maps At Start", false, "Unlock All Maps At the Start");
 
         // Config entries for each map
@@ -136,10 +140,14 @@ public class MapUnlocker : BaseUnityPlugin
 
         resetMapsAfterLeaving.SettingChanged += (sender, args) => {
             hasStoredOriginalData = false;
-            if (resetMapsAfterLeaving.Value) {
+            // stores mapData to reset to when leaving
+            if (resetMapsAfterLeaving.Value)
+            {
                 StoreOriginalDataOnce();
             }
         };
+
+        hasQuill.SettingChanged += (sender, args) => changeQuillBool(hasQuill.Value);
 
         // apply 'unlock/lock all maps' to onClick/onConfigChanged functionalty to all maps config.
         mapConfigs[ALL_MAPS].SettingChanged += (sender, args) => OnConfigChangedAllMaps(mapConfigs[ALL_MAPS].Value);
@@ -154,18 +162,24 @@ public class MapUnlocker : BaseUnityPlugin
     }
 
 
+    /*
+    * StoreMapData: Stores map data from playerData into a bool list
+    * mapData: the bool list that stores the playerData map data
+    */
     private void StoreMapData(bool[] mapData)
     {
         if (PlayerData.instance != null && mapData != null)
         {
             for (int i = 0; i < mapFields.Length && i < mapData.Length; i++)
             {
+                // gets the map field from playerData
                 FieldInfo field = PlayerData.instance.GetType().GetField(mapFields[i], BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
                 if (field != null && field.FieldType == typeof(bool))
                 {
                     bool currentValue = (bool)field.GetValue(PlayerData.instance);
 
-                    // Actually store the value in the array
+                    // Stores the value in the array
                     mapData[i] = currentValue;
                     if (debugMode.Value) Logger.LogInfo($"mapData {mapFields[i]}: {mapData[i]}");
 
@@ -174,14 +188,18 @@ public class MapUnlocker : BaseUnityPlugin
         }
     }
 
-
-    private void RestoreMapData(bool[] mapData) 
+    /*
+    * OverwriteMapData: Applys map data from bool list to playerData's map data
+    * mapData: the bool list that is used to overwrite.
+    */
+    private void OverwriteMapData(bool[] mapData) 
     {
         if (PlayerData.instance != null && mapData != null)
         {
-            if (debugMode.Value) Logger.LogInfo("RestoreMapData Start --------------------------------");
+            if (debugMode.Value) Logger.LogInfo("OverwriteMapData Start --------------------------------");
             for (int i = 0; i < mapFields.Length && i < mapData.Length; i++)
             {
+                // sets the playerData field based on mapData field
                 if (SetPlayerDataBool(PlayerData.instance, mapFields[i], mapData[i]) && debugMode.Value)
                 {
                     Logger.LogInfo($"{mapFields[i]} -> {mapData[i]}!");
@@ -191,6 +209,10 @@ public class MapUnlocker : BaseUnityPlugin
         }
     }
 
+    /*
+    * StoreOriginalDataOnce: Stores the platerData map data into the original map data bool list if
+    * it wans't stored already.
+    */
     private void StoreOriginalDataOnce()
     {
         if (PlayerData.instance != null)
@@ -199,27 +221,34 @@ public class MapUnlocker : BaseUnityPlugin
             {
                 StoreMapData(originalMapData);
                 hasStoredOriginalData = true;
+
                 if (debugMode.Value) Logger.LogInfo("Stored original map data (one-time only)");
                 if (debugMode.Value) DebugArrayContents("originalMapData", originalMapData);
             }
-        } else {
+        }
+        else
+        {
             if (debugMode.Value) Logger.LogInfo("(PlayerData.instance is null");
         }
     }
 
-
+    /*
+    * ChangeConfigDataOnStart: Changes both config data to what maps are enabled already loading into a save.
+    */
     private void ChangeConfigDataOnStart()
     {
         if (PlayerData.instance != null)
         {
             for (int i = 0; i < mapFields.Length && i < mapConfigs.Length; i++)
             {
+                // gets the map field from playerData
                 FieldInfo field = PlayerData.instance.GetType().GetField(mapFields[i], BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
                 if (field != null && field.FieldType == typeof(bool))
                 {
                     bool currentValue = (bool)field.GetValue(PlayerData.instance);
 
-                    // Actually store the value in the array
+                    // enables/disables config based on playerData 
                     mapConfigs[i].Value = currentValue;
                     if (debugMode.Value) Logger.LogInfo($"mapData {mapFields[i]}: {mapConfigs[i].Value}");
 
@@ -237,11 +266,12 @@ public class MapUnlocker : BaseUnityPlugin
         harmony?.UnpatchSelf();
     }
 
+
     /*
     * OnConfigChangedAllMaps: Unlocks or locks all maps within the mapFields list
     * value: the value to change map field values to. 
     */
-    public void OnConfigChangedAllMaps(bool value) 
+    public void OnConfigChangedAllMaps(bool value)
     {
         string action = value ? "Unlocked" : "Locked";
 
@@ -252,12 +282,16 @@ public class MapUnlocker : BaseUnityPlugin
                 if (SetPlayerDataBool(PlayerData.instance, mapFields[map], value))
                 {
                     mapConfigs[map].Value = value;
-                    if (debugMode.Value) Logger.LogInfo(mapFields[map]+" has been "+action+"!");
-                } else {
-                    if (debugMode.Value) Logger.LogInfo(mapFields[map]+" could not be "+action+"! Skipping map...");
+                    if (debugMode.Value) Logger.LogInfo(mapFields[map] + " has been " + action + "!");
+                }
+                else
+                {
+                    if (debugMode.Value) Logger.LogInfo(mapFields[map] + " could not be " + action + "! Skipping map...");
                 }
             }
-        } else {
+        }
+        else
+        {
             if (debugMode.Value) Logger.LogInfo("PlayerData could not be found");
         }
     }
@@ -321,6 +355,21 @@ public class MapUnlocker : BaseUnityPlugin
     }
 
 
+    private void changeQuillBool(bool value)
+    {
+        string action = hasQuill.Value ? "Enabled" : "Disabled";
+        if (SetPlayerDataBool(PlayerData.instance, "hasQuill", hasQuill.Value && debugMode.Value))
+        {
+            Logger.LogInfo($"{action} Quill.");
+        }
+    }
+
+
+    /*
+    * DebugArrayContents: Logs the bool list and its contents into terminal
+    * arrayName: name of bool list variable
+    * array: bool list to log
+    */
     private void DebugArrayContents(string arrayName, bool[] array)
     {
         Logger.LogInfo($"=== {arrayName} Contents ===");
@@ -336,6 +385,7 @@ public class MapUnlocker : BaseUnityPlugin
     [HarmonyPatch]
     internal static class HeroController_Start_Patch
     {
+        // gets the method that allows the player to start controlling the player
         private static MethodBase TargetMethod()
         {
             System.Type type = AccessTools.TypeByName("HeroController");
@@ -346,68 +396,94 @@ public class MapUnlocker : BaseUnityPlugin
             return AccessTools.Method(type, "Start", (System.Type[])null, (System.Type[])null);
         }
         
+        // modifies start method after herocontroller initializes
         private static void Postfix(object __instance)
         {
+            // gets mod instance to run mod functions
             var plugin = UnityEngine.Object.FindAnyObjectByType<MapUnlocker>();
-            if (plugin != null) {
+            if (plugin != null)
+            {
+                // saves map data before mod could modify it
                 if (plugin.resetMapsAfterLeaving.Value)
                 {
                     plugin.StoreOriginalDataOnce();
                     if (plugin.debugMode.Value) plugin.Logger.LogInfo("Stored original map data from HeroController_Start");
                 }
 
+                // unlocks all maps at the start 
                 if (plugin.unlockAllMapsAtStart != null && plugin.unlockAllMapsAtStart.Value)
                 {
                     plugin.OnConfigChangedAllMaps(true);
                     if (plugin.debugMode.Value) plugin.Logger.LogInfo("UnlockAtStart finished.");
                 }
+                // enables all maps already unlocked based on playerData map data
                 else
                 {
                     plugin.ChangeConfigDataOnStart();
                     if (plugin.debugMode.Value) plugin.Logger.LogInfo("Stored config data from HeroController_Start");
                 }
-                
-            } else {
+
+                if (plugin.hasQuill.Value)
+                {
+                    plugin.changeQuillBool(true);
+                    if (plugin.debugMode.Value) plugin.Logger.LogInfo("enabled quill from HeroController_Start");
+                }
+
+            }
+            else
+            {
                 throw new System.Exception("Could not find MapUnlocker mod.");
             }
         }
     }
-    
-    
+
+
+    /* 
+    * modifies saves so that the original map data is saved rather than the modded map data
+    */
     [HarmonyPatch]
     internal static class SaveGameData_Constructor_Patch
     {
+        // gets the method that saves playerData
         private static MethodBase TargetMethod()
         {
             System.Type type = AccessTools.TypeByName("SaveGameData");
             if (type != null)
             {
-                return AccessTools.Constructor(type, new System.Type[] { 
-                    AccessTools.TypeByName("PlayerData"), 
-                    AccessTools.TypeByName("SceneData") 
-                });            
+                return AccessTools.Constructor(type, new System.Type[] {
+                    AccessTools.TypeByName("PlayerData"),
+                    AccessTools.TypeByName("SceneData")
+                });
             }
             return null;
         }
 
+        // modifies save before it runs
         private static void Prefix(PlayerData playerData, SceneData sceneData)
         {
+            // gets mod instance to run mod functions
             var plugin = UnityEngine.Object.FindAnyObjectByType<MapUnlocker>();
+
+            // stores current map data then overwrites playerData map data
             if (plugin != null && plugin.resetMapsAfterLeaving.Value)
             {
                 plugin.StoreMapData(plugin.moddedMapData);
                 if (plugin.debugMode.Value) plugin.DebugArrayContents("originalMapData", plugin.originalMapData);
-                plugin.RestoreMapData(plugin.originalMapData);
+                plugin.OverwriteMapData(plugin.originalMapData);
                 if (plugin.debugMode.Value) plugin.Logger.LogInfo("Restored original map states before SaveGameData constructor");
             }
         }
 
+        // modifies save after it runs
         private static void Postfix(PlayerData playerData, SceneData sceneData)
         {
+            // gets mod instance to run mod functions
             var plugin = UnityEngine.Object.FindAnyObjectByType<MapUnlocker>();
+
+            // overwrites current playerData map data with the map data before the save 
             if (plugin != null && plugin.resetMapsAfterLeaving.Value)
             {
-                plugin.RestoreMapData(plugin.moddedMapData);
+                plugin.OverwriteMapData(plugin.moddedMapData);
                 if (plugin.debugMode.Value) plugin.Logger.LogInfo("Re-applied mod states after SaveGameData constructor");
             }
         }
