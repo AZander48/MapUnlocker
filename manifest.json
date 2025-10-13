@@ -1,0 +1,10 @@
+{
+    "name": "MapUnlocker",
+    "version_number": "1.0.0",
+    "website_url": "https://github.com/AZander48/MapUnlocker.git",
+    "description": "The mod allows you to unlock any map without buying it.",
+    "dependencies": [
+        "BepInEx-BepInExPack_Silksong-5.4.2303"
+    ]
+}
+   
