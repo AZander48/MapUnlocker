@@ -20,33 +20,22 @@ public class MapUnlocker : BaseUnityPlugin
 {
     // Use the inherited Logger property instead of hiding it
     private Harmony harmony = null!;
-    
+
     // Make Logger accessible to managers
     public new BepInEx.Logging.ManualLogSource Logger => base.Logger;
+    public static MapUnlocker Instance { get; private set; } = null!;
 
     // map list index constants
-    public static readonly int ALL_MAPS = 0;
+    public static readonly int ALL_FIELDS = 0;
 
     // Manager instances
     public ResetManager resetManager = null!;
     public ConfigUI configUI = null!;
     private OnStartManager onStartManager = null!;
 
-    public ConfigEntry<bool> debugMode = null!;
-
-    // config entry to enable and disable reseting maps to the original map data when leaving
-    public ConfigEntry<bool> resetMapsAfterLeaving = null!;
-
-    public ConfigEntry<bool> hasQuill = null!;
-
-    // Config entry to enable all maps at the start of a game
-    public ConfigEntry<bool> unlockAllMapsAtStart = null!;
-    // Config entry list to modify each entry with ease
-    public ConfigEntry<bool>[] mapConfigs = null!;
-
     // List of all map fields to unlock from within playerData
     public static readonly string[] mapFields = {
-        "mapAllRooms", 
+        "mapAllRooms",
         "HasMossGrottoMap",
         "HasWildsMap",
         "HasBoneforestMap",
@@ -76,23 +65,49 @@ public class MapUnlocker : BaseUnityPlugin
         "HasAqueductMap",
         "HasWeavehomeMap"
     };
+    
+    public static readonly string[] pinFields =
+    {
+        "hasPinBench",
+        "hasPinCocoon",
+        "hasPinShop",
+        "hasPinSpa",
+        "hasPinStag",
+        "hasPinTube",
+        "hasPinFleaMarrowlands",
+        "hasPinFleaMidlands",
+        "hasPinFleaBlastedlands",
+        "hasPinFleaCitadel",
+        "hasPinFleaPeaklands",
+        "hasPinFleaMucklands"
+    };
 
     private void Awake()
     {
         Logger.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} has loaded!");
         Logger.LogInfo($"Plugin version: {PluginInfo.PLUGIN_VERSION}");
 
-        // Initialize Harmony
-        harmony = new Harmony(PluginInfo.PLUGIN_GUID);
-        harmony.PatchAll();
+        
+        // Set the static instance for patches to access
+        Instance = this;
 
-        // Initialize managers
+        // Initialize managers first
         resetManager = new ResetManager(Logger, this);
         configUI = new ConfigUI(Logger, resetManager, this);
-        onStartManager = new OnStartManager(Logger, this);
+        
+        // Set the configUI reference in resetManager after it's created
+        resetManager.SetConfigUI(configUI);
 
-        // Initialize configuration
+        // Initialize configuration BEFORE applying Harmony patches
         configUI.InitializeConfig();
+
+        // Initialize Harmony after config is ready
+        harmony = new Harmony(PluginInfo.PLUGIN_GUID);
+        harmony.PatchAll();
+        Logger.LogInfo("Harmony patches applied successfully!");
+
+        // Initialize remaining managers
+        onStartManager = new OnStartManager(Logger, this);
         
         Logger.LogInfo("Map Unlocker mod initialization completed");
     }
@@ -125,13 +140,13 @@ public class MapUnlocker : BaseUnityPlugin
             }
             else
             {
-                if (debugMode.Value) Logger.LogWarning($"Field {fieldName} not found or not boolean");
+                if (configUI.debugMode?.Value == true) Logger.LogWarning($"Field {fieldName} not found or not boolean");
                 return false;
             }
         }
         catch (System.Exception ex)
         {
-            if (debugMode.Value) Logger.LogError($"Error setting {fieldName}: {ex.Message}");
+            if (configUI.debugMode?.Value == true) Logger.LogError($"Error setting {fieldName}: {ex.Message}");
             return false;
         }
     }
@@ -139,8 +154,8 @@ public class MapUnlocker : BaseUnityPlugin
 
     public void changeQuillBool(bool value)
     {
-        string action = hasQuill.Value ? "Enabled" : "Disabled";
-        if (SetPlayerDataBool(PlayerData.instance, "hasQuill", hasQuill.Value))
+        string action = configUI.hasQuill.Value ? "Enabled" : "Disabled";
+        if (SetPlayerDataBool(PlayerData.instance, "hasQuill", configUI.hasQuill.Value))
         {
             Logger.LogInfo($"{action} Quill.");
         }
@@ -165,7 +180,7 @@ public class MapUnlocker : BaseUnityPlugin
 
                     // Stores the value in the array
                     mapData[i] = currentValue;
-                    if (debugMode != null && debugMode.Value) Logger.LogInfo($"mapData {mapFields[i]}: {mapData[i]}");
+                    if (configUI.debugMode?.Value == true) Logger.LogInfo($"mapData {mapFields[i]}: {mapData[i]}");
                 }
             }
         }
