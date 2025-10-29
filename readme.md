@@ -101,4 +101,6 @@ This mod is provided as-is for educational and entertainment purposes. Please re
 
 ## Version History
 
+- **v1.1.1**: Map pin bug fixes.
+- **v1.1.0**: Map pin additions and config menu improvements.
 - **v1.0.0**: Initial release with full map unlocking functionality

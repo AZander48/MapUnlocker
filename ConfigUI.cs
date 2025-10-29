@@ -4,6 +4,7 @@ using BepInEx;
 using System.Reflection;
 using System.Linq;
 using GlobalSettings;
+using UnityEngine.UIElements;
 
 namespace MapUnlocker
 {
@@ -37,6 +38,7 @@ namespace MapUnlocker
         public ConfigEntry<bool>? unlockAllMapsAtStart;
         public ConfigEntry<bool>[]? mapConfigs;
         public ConfigEntry<bool>? unlockAllPinsAtStart;
+        public ConfigEntry<bool>? unlockAllPins;
         public ConfigEntry<bool>[]? pinConfigs;
 
         // bool list to hold mapData for resets and saves 
@@ -44,7 +46,9 @@ namespace MapUnlocker
         public bool[] moddedMapData;
 
         private bool allowChangeAllMaps = true;
+        private bool isChangingAllMaps = false;
         private bool allowChangeAllPins = true;
+        private bool isChangingAllPins = false;
 
         /*
         * InitializeConfig: initializes the configuration menu binds and ui while applying onClick functionality.
@@ -89,9 +93,11 @@ namespace MapUnlocker
                 Config.Bind("Maps", "Unlock the Map for Weavehome", false, "Unlock Weavehome")
             };
 
+
+            unlockAllPins = Config.Bind("Pins", "Unlock All Pins Now", false, "Unlock All Pins");
+
             // Config entries for each pin
             pinConfigs = new ConfigEntry<bool>[] {
-                Config.Bind("Pins", "Unlock All Pins Now", false, "Unlock All Pins"),
                 Config.Bind("Pins", "Unlock the Bench Pin", false, "Unlock Bench Pin"),
                 Config.Bind("Pins", "Unlock the Cocoon Pin", false, "Unlock Cocoon Pin"),
                 Config.Bind("Pins", "Unlock the Shop Pin forest", false, "Unlock Bone Shop Pin"),
@@ -122,8 +128,8 @@ namespace MapUnlocker
             // apply 'unlock/lock all maps' to onClick/onConfigChanged functionalty to all maps config.
             mapConfigs[MapUnlocker.ALL_FIELDS].SettingChanged += (sender, args) => OnConfigChangedAllMaps(mapConfigs[MapUnlocker.ALL_FIELDS].Value);
 
-            // apply 'unlock/lock all maps' to onClick/onConfigChanged functionalty to all maps config.
-            pinConfigs[MapUnlocker.ALL_FIELDS].SettingChanged += (sender, args) => OnConfigChangedAllPins(pinConfigs[MapUnlocker.ALL_FIELDS].Value);
+            // apply 'unlock/lock all pin' to onClick/onConfigChanged functionalty to all maps config.
+            unlockAllPins.SettingChanged += (sender, args) => OnConfigChangedAllPins(unlockAllPins.Value);
 
             // applies 'unlock/lock map' to onClick/onConfigChanged functionalty to all map configs.
             for (int map = 1; map < mapConfigs.Length; map++)
@@ -133,9 +139,10 @@ namespace MapUnlocker
             }
             
             // applies 'unlock/lock pin' to onClick/onConfigChanged functionalty to all pin configs.
-            for (int pin = 1; pin < pinConfigs.Length; pin++) {
+            for (int pin = 0; pin < pinConfigs.Length; pin++) 
+            {
                 int currentPin = pin;
-                pinConfigs[currentPin].SettingChanged += (sender, args) => OnConfigChangedPin(MapUnlocker.pinFields[currentPin],  pinConfigs[currentPin].Value);
+                pinConfigs[currentPin].SettingChanged += (sender, args) => OnConfigChangedPin(MapUnlocker.pinFields[currentPin], pinConfigs[currentPin].Value);
             }
 
             if (debugMode!.Value) Logger.LogInfo($"Configuration initialized with {mapConfigs!.Length} map configs");
@@ -195,10 +202,13 @@ namespace MapUnlocker
                 allowChangeAllMaps = true;
                 return;
             }
+            
             string action = value ? "Unlocked" : "Locked";
 
             if (PlayerData.instance != null)
             {
+                isChangingAllMaps = true;
+
                 for (int map = 0; map < MapUnlocker.mapFields.Length; map++)
                 {
                     if (plugin.SetPlayerDataBool(PlayerData.instance, MapUnlocker.mapFields[map], value))
@@ -216,6 +226,8 @@ namespace MapUnlocker
             {
                 if (debugMode!.Value) Logger.LogInfo("PlayerData could not be found");
             }
+
+            isChangingAllMaps = false;
         }
 
         /*
@@ -236,7 +248,7 @@ namespace MapUnlocker
                     if (!value && mapConfigs![MapUnlocker.ALL_FIELDS].Value)
                     {
                         plugin.SetPlayerDataBool(PlayerData.instance, MapUnlocker.mapFields[MapUnlocker.ALL_FIELDS], false);
-                        allowChangeAllMaps = false;
+                        if (!isChangingAllMaps) allowChangeAllMaps = false;
                         mapConfigs![MapUnlocker.ALL_FIELDS].Value = false;
                     }
 
@@ -288,6 +300,9 @@ namespace MapUnlocker
 
             if (PlayerData.instance != null)
             {
+                isChangingAllPins = true;
+                if (debugMode!.Value) Logger.LogInfo(pinConfigs.GetCount() + " pinConfigs!");
+                if (debugMode!.Value) Logger.LogInfo(MapUnlocker.pinFields.GetCount() + " pinFields!");
                 for (int pin = 0; pin < MapUnlocker.pinFields.Length; pin++)
                 {
                     if (plugin.SetPlayerDataBool(PlayerData.instance, MapUnlocker.pinFields[pin], value))
@@ -305,6 +320,8 @@ namespace MapUnlocker
             {
                 if (debugMode!.Value) Logger.LogInfo("PlayerData could not be found");
             }
+
+            isChangingAllPins = false;
         }
 
 
@@ -320,7 +337,7 @@ namespace MapUnlocker
                 {
                     if (!value) {
                         plugin.SetPlayerDataBool(PlayerData.instance, MapUnlocker.pinFields[MapUnlocker.ALL_FIELDS], value);
-                        allowChangeAllPins = false;
+                        if (!isChangingAllPins) allowChangeAllPins = false;
                         pinConfigs![MapUnlocker.ALL_FIELDS].Value = value;
                     }
                     
