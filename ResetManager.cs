@@ -12,6 +12,7 @@ using GlobalSettings;
 using HarmonyLib;
 using HutongGames.PlayMaker.Actions;
 using Microsoft.CodeAnalysis;
+using Unity.Mathematics;
 
 namespace MapUnlocker
 {
@@ -21,11 +22,16 @@ namespace MapUnlocker
         private MapUnlocker plugin;
         private ConfigUI configUI;
 
+        // bool list to hold mapData for resets and saves 
+        public static bool[] originalMapData = new bool[MapUnlocker.mapFields.Length];
+        public static bool[] moddedMapData = new bool[MapUnlocker.mapFields.Length];
+        public static bool[] originalPinData = new bool[MapUnlocker.pinFields.Length];
+        public static bool[] moddedPinData = new bool[MapUnlocker.pinFields.Length];
+
         public ResetManager(BepInEx.Logging.ManualLogSource logger, MapUnlocker plugin)
         {
             this.Logger = logger;
             this.plugin = plugin;
-            // configUI will be set later via SetConfigUI method
         }
 
         public void SetConfigUI(ConfigUI configUI)
@@ -34,44 +40,144 @@ namespace MapUnlocker
         }
 
         /*
-        * StoreOriginalDataOnce: Stores the platerData map data into the original map data bool list.
+        * StoreBoolData: Stores pin data from playerData into a bool list
+        * boolData: the bool list that stores the playerData map data
+        * playerDataFields: 
         */
-        public void StoreOriginalData()
+        public void StoreBoolData(bool[] boolData, string[] playerDataFields)
         {
-            if (PlayerData.instance != null && configUI != null)
+            if (PlayerData.instance != null && boolData != null)
             {
-                plugin.StoreMapData(plugin.configUI.originalMapData);
+                for (int i = 0; i < playerDataFields.Length && i < boolData.Length; i++)
+                {
+                    // gets the map field from playerData
+                    FieldInfo field = PlayerData.instance.GetType().GetField(playerDataFields[i], BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
-                if (configUI.debugMode?.Value == true) Logger.LogInfo("Stored original map data (one-time only)");
-                plugin.DebugArrayContents("originalMapData", plugin.configUI.originalMapData);
+                    if (field != null && field.FieldType == typeof(bool))
+                    {
+                        bool currentValue = (bool)field.GetValue(PlayerData.instance);
+
+                        // Stores the value in the array
+                        boolData[i] = currentValue;
+                        if (configUI.debugMode?.Value == true) Logger.LogInfo($"{playerDataFields[i]}: {boolData[i]}");
+                    }
+                }
+
+
+                if (configUI.debugMode?.Value == true)
+                {
+                    Logger.LogInfo("Stored original data");
+                    plugin.DebugArrayContents("originalBoolData", boolData);
+                }
             }
             else
             {
                 Logger.LogInfo("(PlayerData.instance is null or configUI not initialized");
             }
         }
+        
 
         /*
-        * OverwriteMapData: Applys map data from bool list to playerData's map data
-        * mapData: the bool list that is used to overwrite.
+        * StoreBoolData: Stores pin data from playerData into a bool list
+        * boolData: the bool list that stores the playerData map data
+        * playerDataFields: 
         */
-        public void OverwriteMapData(bool[] mapData) 
+        public void StoreBoolData(bool[] boolData, FieldInfo[] playerDataFields)
         {
-            if (PlayerData.instance != null && mapData != null && configUI != null)
+            if (PlayerData.instance != null && boolData != null)
             {
-                Logger.LogInfo("OverwriteMapData Start --------------------------------");
-                for (int i = 0; i < MapUnlocker.mapFields.Length && i < mapData.Length; i++)
+                for (int i = 0; i < playerDataFields.Length && i < boolData.Length; i++)
                 {
-                    // sets the playerData field based on mapData field
-                    if (plugin.SetPlayerDataBool(PlayerData.instance, MapUnlocker.mapFields[i], mapData[i]) && configUI.debugMode?.Value == true)
+                    // gets the map field from playerData
+                    var currentValue = MapUnlocker.GetPlayerDataBoolValue(playerDataFields[i]);
+
+                    if (currentValue != null)
                     {
-                        Logger.LogInfo($"{MapUnlocker.mapFields[i]} -> {mapData[i]}!");
+                        // Stores the value in the array
+                        boolData[i] = (bool)currentValue;
+                        if (configUI.debugMode?.Value == true) Logger.LogInfo($"{playerDataFields[i]}: {boolData[i]}");
+                    } else
+                    {
+                        Logger.LogError($"Could not get playerDataField value {i}!");
                     }
                 }
-                Logger.LogInfo("Restored map states");
+
+                
+                if (configUI.debugMode?.Value == true)
+                {
+                    Logger.LogInfo("Stored original data");
+                    plugin.DebugArrayContents("originalBoolData", boolData);
+                } 
+            } else
+            {
+                Logger.LogInfo("(PlayerData.instance is null or configUI not initialized");
             }
         }
 
+
+        /*
+        * OverwriteBoolData: Applys map data from bool list to playerData's map data
+        * boolData: the bool list that is used to overwrite.
+        * playerDataFields: 
+        */
+        public void OverwriteBoolData(bool[] boolData, string[] playerDataFields)
+        {
+            if (PlayerData.instance != null && boolData != null && configUI != null)
+            {
+                if (configUI.debugMode?.Value == true) Logger.LogInfo("OverwriteMapData Start --------------------------------");
+                for (int i = 0; i < playerDataFields.Length && i < boolData.Length; i++)
+                {
+                    // sets the playerData field based on pinData field
+                    if (plugin.SetPlayerDataBool(PlayerData.instance, playerDataFields[i], boolData[i]) && configUI.debugMode?.Value == true)
+                    {
+                        Logger.LogInfo($"{playerDataFields[i]} -> {boolData[i]}!");
+                    }
+                }
+                if (configUI.debugMode?.Value == true) Logger.LogInfo("Restored pin states");
+            }
+        }
+
+        /*
+        * OverwriteBoolData: Applys map data from bool list to playerData's map data
+        * boolData: the bool list that is used to overwrite.
+        * playerDataFields: 
+        */
+        public void OverwriteBoolData(bool[] boolData, FieldInfo[] playerDataFields)
+        {
+            if (PlayerData.instance != null && boolData != null && configUI != null)
+            {
+                if (configUI.debugMode?.Value == true) Logger.LogInfo("OverwriteBoolData Start --------------------------------");
+                for (int i = 0; i < playerDataFields.Length && i < boolData.Length; i++)
+                {
+                    // sets the playerData field based on pinData field
+                    if (
+                        plugin.SetPlayerDataBool(playerDataFields[i], boolData[i]) 
+                        && configUI.debugMode?.Value == true
+                        )
+                    {
+                        Logger.LogInfo($"playerDataFields: {playerDataFields[i]} -> {boolData[i]}!");
+                    }
+                }
+                if (configUI.debugMode?.Value == true) Logger.LogInfo("Restored pin states");
+            }
+        }
+
+        /*
+        * StoreOriginalData: Stores the platerData map data into the original map data bool list.
+        */
+        public void StoreOriginalData()
+        {
+            if (PlayerData.instance != null && configUI != null)
+            {
+                StoreBoolData(originalMapData, MapUnlocker.playerDataFieldsBools[MapUnlocker.MAPS]);
+                StoreBoolData(originalPinData, MapUnlocker.playerDataFieldsBools[MapUnlocker.PINS]);
+            }
+            else
+            {
+                Logger.LogInfo("(PlayerData.instance is null or configUI not initialized");
+            }
+        }
+        
         /* 
         * modifies saves so that the original map data is saved rather than the modded map data
         */
@@ -96,14 +202,19 @@ namespace MapUnlocker
             private static void Prefix(PlayerData playerData, SceneData sceneData)
             {
                 // gets mod instance to run mod functions
-                var plugin = UnityEngine.Object.FindAnyObjectByType<MapUnlocker>();
+                var plugin = MapUnlocker.Instance;
 
                 // stores current map data then overwrites playerData map data
-                if (plugin != null && plugin.configUI.resetMapsAfterLeaving?.Value == true)
+                if (plugin != null && plugin.configUI.resetDataAfterLeaving?.Value == true)
                 {
-                    plugin.StoreMapData(plugin.configUI.moddedMapData);
-                    plugin.DebugArrayContents("originalMapData", plugin.configUI.originalMapData);
-                    plugin.resetManager.OverwriteMapData(plugin.configUI.originalMapData);
+                    plugin.resetManager.StoreBoolData(moddedMapData, MapUnlocker.playerDataFieldsBools[MapUnlocker.MAPS]);
+                    plugin.resetManager.StoreBoolData(moddedPinData, MapUnlocker.playerDataFieldsBools[MapUnlocker.PINS]);
+
+                    if (plugin.configUI?.debugMode.Value == true) plugin.DebugArrayContents("originalMapData", originalMapData);
+
+                    plugin.resetManager.OverwriteBoolData(originalMapData, MapUnlocker.playerDataFieldsBools[MapUnlocker.MAPS]);
+                    plugin.resetManager.OverwriteBoolData(originalPinData, MapUnlocker.playerDataFieldsBools[MapUnlocker.PINS]);
+
                     plugin.Logger.LogInfo("Restored original map states before SaveGameData constructor");
                 }
             }
@@ -115,9 +226,11 @@ namespace MapUnlocker
                 var plugin = UnityEngine.Object.FindAnyObjectByType<MapUnlocker>();
 
                 // overwrites current playerData map data with the map data before the save 
-                if (plugin != null && plugin.configUI.resetMapsAfterLeaving?.Value == true)
+                if (plugin != null && plugin.configUI.resetDataAfterLeaving?.Value == true)
                 {
-                    plugin.resetManager.OverwriteMapData(plugin.configUI.moddedMapData);
+                    plugin.resetManager.OverwriteBoolData(moddedMapData, MapUnlocker.playerDataFieldsBools[MapUnlocker.MAPS]);
+                    plugin.resetManager.OverwriteBoolData(moddedPinData, MapUnlocker.playerDataFieldsBools[MapUnlocker.PINS]);
+                    
                     plugin.Logger.LogInfo("Re-applied mod states after SaveGameData constructor");
                 }
             }

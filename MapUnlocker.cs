@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.Versioning;
@@ -27,6 +28,8 @@ public class MapUnlocker : BaseUnityPlugin
 
     // map list index constants
     public static readonly int ALL_FIELDS = 0;
+    public static readonly int MAPS = 0;
+    public static readonly int PINS = 1;
 
     // Manager instances
     public ResetManager resetManager = null!;
@@ -34,6 +37,7 @@ public class MapUnlocker : BaseUnityPlugin
     private OnStartManager onStartManager = null!;
 
     // List of all map fields to unlock from within playerData
+    
     public static readonly string[] mapFields = {
         "mapAllRooms",
         "HasMossGrottoMap",
@@ -65,7 +69,7 @@ public class MapUnlocker : BaseUnityPlugin
         "HasAqueductMap",
         "HasWeavehomeMap"
     };
-    
+
     public static readonly string[] pinFields =
     {
         "hasPinBench",
@@ -82,12 +86,23 @@ public class MapUnlocker : BaseUnityPlugin
         "hasPinFleaMucklands"
     };
 
+    // FieldInfo objects to reference PlayerData fields dynamically
+    public static readonly FieldInfo[][] playerDataFieldsBools =
+    [
+        mapFields.Select(fieldName => 
+            typeof(PlayerData).GetField(fieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+        ).ToArray(),
+        pinFields.Select(fieldName => 
+            typeof(PlayerData).GetField(fieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+        ).ToArray()
+    ];
+    
+
     private void Awake()
     {
         Logger.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} has loaded!");
         Logger.LogInfo($"Plugin version: {PluginInfo.PLUGIN_VERSION}");
 
-        
         // Set the static instance for patches to access
         Instance = this;
 
@@ -119,6 +134,40 @@ public class MapUnlocker : BaseUnityPlugin
         harmony?.UnpatchSelf();
     }
 
+
+    // Helper method to get the bool value from a FieldInfo
+    public static bool GetPlayerDataBoolValue(int category, int index)
+    {
+        if (PlayerData.instance == null ||
+            category < 0 || category >= playerDataFieldsBools.Length ||
+            index < 0 || index >= playerDataFieldsBools[category].Length ||
+            playerDataFieldsBools[category][index] == null)
+        {
+            return false;
+        }
+
+        var field = playerDataFieldsBools[category][index];
+        if (field.FieldType == typeof(bool))
+        {
+            return (bool)field.GetValue(PlayerData.instance);
+        }
+        return false;
+    }
+
+    public static bool? GetPlayerDataBoolValue(FieldInfo fieldInfo)
+    {
+        if (PlayerData.instance != null && fieldInfo != null)
+        {
+            if (fieldInfo.FieldType == typeof(bool))
+            {
+                return (bool)fieldInfo.GetValue(PlayerData.instance);
+            }
+        }
+
+        return null;
+    }
+    
+
     /*
     * SetPlayerDataBool: changes the value of a playerData field based on the value.
     * playerData: The player's data instance.
@@ -131,11 +180,12 @@ public class MapUnlocker : BaseUnityPlugin
         {
             // get the field within the playerData instance based on fieldName
             FieldInfo field = playerData.GetType().GetField(fieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            
+
             // checks if field exists or is contains a boolean for value
             if (field != null && field.FieldType == typeof(bool))
             {
                 field.SetValue(playerData, value);
+                Logger.LogInfo($"{fieldName}: {value}");
                 return true;
             }
             else
@@ -144,11 +194,30 @@ public class MapUnlocker : BaseUnityPlugin
                 return false;
             }
         }
-        catch (System.Exception ex)
+        catch (Exception ex)
         {
             if (configUI.debugMode?.Value == true) Logger.LogError($"Error setting {fieldName}: {ex.Message}");
             return false;
         }
+    }
+    
+
+    public bool SetPlayerDataBool(FieldInfo fieldInfo, bool value)
+    {
+        if (PlayerData.instance != null && fieldInfo != null)
+        {
+            if (fieldInfo.FieldType == typeof(bool))
+            {
+                fieldInfo.SetValue(PlayerData.instance, value);
+                if (configUI.debugMode?.Value == true) Logger.LogInfo($"{fieldInfo.Name}: {value}");
+                return true;
+            }
+
+            
+            if (configUI.debugMode?.Value == true) Logger.LogInfo($"{fieldInfo.Name} is not a boolean.");
+        }
+
+        return false;
     }
 
 
@@ -158,31 +227,6 @@ public class MapUnlocker : BaseUnityPlugin
         if (SetPlayerDataBool(PlayerData.instance, "hasQuill", configUI.hasQuill.Value))
         {
             Logger.LogInfo($"{action} Quill.");
-        }
-    }
-
-    /*
-    * StoreMapData: Stores map data from playerData into a bool list
-    * mapData: the bool list that stores the playerData map data
-    */
-    public void StoreMapData(bool[] mapData)
-    {
-        if (PlayerData.instance != null && mapData != null)
-        {
-            for (int i = 0; i < mapFields.Length && i < mapData.Length; i++)
-            {
-                // gets the map field from playerData
-                FieldInfo field = PlayerData.instance.GetType().GetField(mapFields[i], BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-
-                if (field != null && field.FieldType == typeof(bool))
-                {
-                    bool currentValue = (bool)field.GetValue(PlayerData.instance);
-
-                    // Stores the value in the array
-                    mapData[i] = currentValue;
-                    if (configUI.debugMode?.Value == true) Logger.LogInfo($"mapData {mapFields[i]}: {mapData[i]}");
-                }
-            }
         }
     }
 

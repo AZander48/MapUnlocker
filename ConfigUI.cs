@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Linq;
 using GlobalSettings;
 using UnityEngine.UIElements;
+using System.Diagnostics;
 
 namespace MapUnlocker
 {
@@ -19,9 +20,6 @@ namespace MapUnlocker
             this.resetManager = resetManager;
             this.plugin = plugin;
             
-            // Initialize arrays after plugin is set
-            this.originalMapData = new bool[MapUnlocker.mapFields.Length];
-            this.moddedMapData = new bool[MapUnlocker.mapFields.Length];
         }
 
         private BepInEx.Logging.ManualLogSource Logger;
@@ -33,22 +31,20 @@ namespace MapUnlocker
 
         // Config entries
         public ConfigEntry<bool>? debugMode;
-        public ConfigEntry<bool>? resetMapsAfterLeaving;
+        public ConfigEntry<bool>? resetDataAfterLeaving;
         public ConfigEntry<bool>? hasQuill;
         public ConfigEntry<bool>? unlockAllMapsAtStart;
+        public ConfigEntry<bool>? unlockAllMaps;
         public ConfigEntry<bool>[]? mapConfigs;
         public ConfigEntry<bool>? unlockAllPinsAtStart;
         public ConfigEntry<bool>? unlockAllPins;
         public ConfigEntry<bool>[]? pinConfigs;
 
-        // bool list to hold mapData for resets and saves 
-        public bool[] originalMapData;
-        public bool[] moddedMapData;
 
-        private bool allowChangeAllMaps = true;
-        private bool isChangingAllMaps = false;
-        private bool allowChangeAllPins = true;
-        private bool isChangingAllPins = false;
+        private static bool allowChangeAllMaps = true;
+        private static bool isChangingAllMaps = false;
+        private static bool allowChangeAllPins = true;
+        private static bool isChangingAllPins = false;
 
         /*
         * InitializeConfig: initializes the configuration menu binds and ui while applying onClick functionality.
@@ -56,13 +52,17 @@ namespace MapUnlocker
         public void InitializeConfig()
         {
             debugMode = Config.Bind("Debug", "Debug mode", false, "Enables log messages for debugging purposes.");
-            resetMapsAfterLeaving = Config.Bind("General", "Reset Maps after leaving", false, "Resets all maps to original state after leaving.");
+            resetDataAfterLeaving = Config.Bind("General", "Reset Maps after leaving", false, "Resets all maps to original state after leaving.");
+            
             hasQuill = Config.Bind("General", "Has Quill", false, "Enables the quill tool.");
+
             unlockAllMapsAtStart = Config.Bind("Maps", "Unlock All Maps At Start", false, "Unlock All Maps At the Start");
+
+            
 
             // Config entries for each map
             mapConfigs = new ConfigEntry<bool>[] {
-                Config.Bind("Maps", "Unlock All Maps Now", false, "Unlock All Maps"),
+                unlockAllMaps = Config.Bind("Maps", "Unlock All Maps Now", false, "Unlock All Maps"),
                 Config.Bind("Maps", "Unlock the Map for Moss Grotto", false, "Unlock Moss Grotto"),
                 Config.Bind("Maps", "Unlock the Map for Wilds", false, "Unlock Wilds"),
                 Config.Bind("Maps", "Unlock the Map for Bone forest", false, "Unlock Bone forest"),
@@ -93,6 +93,7 @@ namespace MapUnlocker
                 Config.Bind("Maps", "Unlock the Map for Weavehome", false, "Unlock Weavehome")
             };
 
+            unlockAllPinsAtStart = Config.Bind("Pins", "Unlock All Pins At Start", false, "Unlock All Pins At the Start");
 
             unlockAllPins = Config.Bind("Pins", "Unlock All Pins Now", false, "Unlock All Pins");
 
@@ -110,14 +111,14 @@ namespace MapUnlocker
                 Config.Bind("Pins", "Unlock the FleaCitadel Pin Steps", false, "Unlock Judge FleaCitadel Pin"),
                 Config.Bind("Pins", "Unlock the FleaPeaklands Pin", false, "Unlock FleaPeaklands Pin"),
                 Config.Bind("Pins", "Unlock the FleaMucklands Pin", false, "Unlock FleaMucklands Pin")
-            };
+            }; 
 
             // Add this line to explicitly create the config file
             Config.Save();
 
-            resetMapsAfterLeaving.SettingChanged += (sender, args) => {
+            resetDataAfterLeaving.SettingChanged += (sender, args) => {
                 // stores mapData to reset to when leaving
-                if (resetMapsAfterLeaving.Value)
+                if (resetDataAfterLeaving.Value)
                 {
                     resetManager.StoreOriginalData();
                 }
@@ -126,194 +127,143 @@ namespace MapUnlocker
             hasQuill.SettingChanged += (sender, args) => plugin.changeQuillBool(hasQuill.Value);
 
             // apply 'unlock/lock all maps' to onClick/onConfigChanged functionalty to all maps config.
-            mapConfigs[MapUnlocker.ALL_FIELDS].SettingChanged += (sender, args) => OnConfigChangedAllMaps(mapConfigs[MapUnlocker.ALL_FIELDS].Value);
+            unlockAllMaps.SettingChanged += (sender, args) => OnConfigChangeAll(unlockAllMaps.Value, 0);
 
-            // apply 'unlock/lock all pin' to onClick/onConfigChanged functionalty to all maps config.
-            unlockAllPins.SettingChanged += (sender, args) => OnConfigChangedAllPins(unlockAllPins.Value);
+            // apply 'unlock/lock all pin' to onClick/onConfigChanged functionalty to all pins config.
+            unlockAllPins.SettingChanged += (sender, args) => OnConfigChangeAll(unlockAllPins.Value, 1);
 
             // applies 'unlock/lock map' to onClick/onConfigChanged functionalty to all map configs.
             for (int map = 1; map < mapConfigs.Length; map++)
             {
                 int currentMap = map;
-                mapConfigs[currentMap].SettingChanged += (sender, args) => OnConfigChangedMap(MapUnlocker.mapFields[currentMap], mapConfigs[currentMap].Value);
+                mapConfigs[currentMap].SettingChanged += (sender, args) =>
+                {
+                    OnConfigChange
+                    (
+                        MapUnlocker.playerDataFieldsBools[MapUnlocker.MAPS][currentMap],
+                        mapConfigs[currentMap].Value,
+                        ref allowChangeAllMaps,
+                        ref isChangingAllMaps,
+                        ref unlockAllMaps
+                    );
+
+                    if (!mapConfigs[currentMap].Value)
+                    {
+                        plugin.SetPlayerDataBool
+                        (
+                            MapUnlocker.playerDataFieldsBools[MapUnlocker.MAPS][MapUnlocker.ALL_FIELDS],
+                            false
+                        );
+                    }
+                };
             }
             
             // applies 'unlock/lock pin' to onClick/onConfigChanged functionalty to all pin configs.
             for (int pin = 0; pin < pinConfigs.Length; pin++) 
             {
                 int currentPin = pin;
-                pinConfigs[currentPin].SettingChanged += (sender, args) => OnConfigChangedPin(MapUnlocker.pinFields[currentPin], pinConfigs[currentPin].Value);
+                pinConfigs[currentPin].SettingChanged += (sender, args) => OnConfigChange
+                (
+                    MapUnlocker.playerDataFieldsBools[MapUnlocker.PINS][currentPin],
+                    pinConfigs[currentPin].Value,
+                    ref allowChangeAllPins,
+                    ref isChangingAllPins,
+                    ref unlockAllPins
+                );
             }
 
             if (debugMode!.Value) Logger.LogInfo($"Configuration initialized with {mapConfigs!.Length} map configs");
         }
 
-        /*
-        * ChangeMapsConfigDataOnStart: Changes both config data to what maps are enabled already loading into a save.
-        */
-        public void ChangeMapsConfigDataOnStart()
+        public void ChangeConfigData(ConfigEntry<bool>[] configBools, string[] dataFields)
         {
             if (PlayerData.instance != null)
             {
-                for (int i = 0; i < MapUnlocker.mapFields.Length && i < mapConfigs.Length; i++)
+                for (int i = 0; i < dataFields.Length && i < configBools.Length; i++)
                 {
                     // gets the map field from playerData
-                    FieldInfo field = PlayerData.instance.GetType().GetField(MapUnlocker.mapFields[i], BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    FieldInfo field = PlayerData.instance.GetType().GetField(dataFields[i], BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
                     if (field != null && field.FieldType == typeof(bool))
                     {
                         bool currentValue = (bool)field.GetValue(PlayerData.instance);
 
                         // enables/disables config based on playerData 
-                        mapConfigs![i].Value = currentValue;
-                        if (debugMode!.Value) Logger.LogInfo($"mapData {MapUnlocker.mapFields[i]}: {mapConfigs![i].Value}");
+                        configBools[i].Value = currentValue;
+                        if (debugMode!.Value) Logger.LogInfo($"{dataFields[i]}: {configBools[i].Value}");
 
-                    }
-                }
-
-                for (int i = 0; i < MapUnlocker.pinFields.Length && i < pinConfigs.Length; i++) 
-                {
-                    // gets the map field from playerData
-                    FieldInfo field = PlayerData.instance.GetType().GetField(MapUnlocker.pinFields[i], BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-
-                    if (field != null && field.FieldType == typeof(bool))
-                    {
-                        bool currentValue = (bool)field.GetValue(PlayerData.instance);
-
-                        // enables/disables config based on playerData 
-                        pinConfigs![i].Value = currentValue;
-                        if (debugMode!.Value) Logger.LogInfo($"pinData {MapUnlocker.pinFields[i]}: {pinConfigs![i].Value}");
-
-                    }
-                }
-            } else {
-                if (debugMode!.Value) Logger.LogInfo("(PlayerData.instance is null");
-            }
-        }
-
-        /*
-        * OnConfigChangedAllMaps: Unlocks or locks all maps within the mapFields list
-        * value: the value to change map field values to. 
-        */
-        public void OnConfigChangedAllMaps(bool value)
-        {
-            if (!allowChangeAllMaps)
-            {
-                allowChangeAllMaps = true;
-                return;
-            }
-            
-            string action = value ? "Unlocked" : "Locked";
-
-            if (PlayerData.instance != null)
-            {
-                isChangingAllMaps = true;
-
-                for (int map = 0; map < MapUnlocker.mapFields.Length; map++)
-                {
-                    if (plugin.SetPlayerDataBool(PlayerData.instance, MapUnlocker.mapFields[map], value))
-                    {
-                        mapConfigs![map].Value = value;
-                        if (debugMode!.Value) Logger.LogInfo(MapUnlocker.mapFields[map] + " has been " + action + "!");
-                    }
-                    else
-                    {
-                        if (debugMode!.Value) Logger.LogInfo(MapUnlocker.mapFields[map] + " could not be " + action + "! Skipping map...");
                     }
                 }
             }
             else
             {
-                if (debugMode!.Value) Logger.LogInfo("PlayerData could not be found");
+                if (debugMode!.Value) Logger.LogInfo("(PlayerData.instance is null");
             }
-
-            isChangingAllMaps = false;
         }
 
-        /*
-        * OnConfigChangedMap: Locks or unlocks a map based on the mapName field.
-        * mapName: The playerData field name to target.
-        * value: Determines if the map should be unlocked or not.
-        */
-        private void OnConfigChangedMap(string mapName, bool value)
-        {
-            // lock or unlocking string message purely for debugging purposes
-            string action = value ? "Unlocked" : "Locked";
 
+        public void ChangeConfigData(ConfigEntry<bool>[] configBools, FieldInfo[] dataFields)
+        {
             if (PlayerData.instance != null)
             {
-                // checks an logs if modifying the map data field was successful or not
-                if (plugin.SetPlayerDataBool(PlayerData.instance, mapName, value))
+                for (int i = 0; i < dataFields.Length && i < configBools.Length; i++)
                 {
-                    if (!value && mapConfigs![MapUnlocker.ALL_FIELDS].Value)
-                    {
-                        plugin.SetPlayerDataBool(PlayerData.instance, MapUnlocker.mapFields[MapUnlocker.ALL_FIELDS], false);
-                        if (!isChangingAllMaps) allowChangeAllMaps = false;
-                        mapConfigs![MapUnlocker.ALL_FIELDS].Value = false;
-                    }
+                    // gets the map field from playerData
+                    FieldInfo field = dataFields[i];
 
+                    if (field != null && field.FieldType == typeof(bool))
+                    {
+                        bool currentValue = (bool)field.GetValue(PlayerData.instance);
+
+                        // enables/disables config based on playerData 
+                        configBools[i].Value = currentValue;
+                        if (debugMode!.Value) Logger.LogInfo($"{dataFields[i]}: {configBools[i].Value}");
+
+                    }
                 }
-                else
-                {
-                    if (debugMode!.Value) Logger.LogInfo(mapName + " could not be " + action + "!");
-                }
+            }
+            else
+            {
+                if (debugMode!.Value) Logger.LogInfo("(PlayerData.instance is null");
             }
         }
         
 
         /*
-        * ChangePinConfigDataOnStart: .
+        * OnConfigChangedAllMaps: Unlocks or locks all maps within the mapFields list
+        * value: the value to change map field values to. 
         */
-        public void ChangePinsConfigDataOnStart()
+        public void OnConfigChangeAll(bool value, int choice)
         {
-            if (PlayerData.instance != null)
+            switch (choice)
             {
-                for (int i = 0; i < MapUnlocker.pinFields.Length && i < pinConfigs.Length; i++) 
-                {
-                    // gets the map field from playerData
-                    FieldInfo field = PlayerData.instance.GetType().GetField(MapUnlocker.pinFields[i], BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-
-                    if (field != null && field.FieldType == typeof(bool))
-                    {
-                        bool currentValue = (bool)field.GetValue(PlayerData.instance);
-
-                        // enables/disables config based on playerData 
-                        pinConfigs![i].Value = currentValue;
-                        if (debugMode!.Value) Logger.LogInfo($"pinData {MapUnlocker.pinFields[i]}: {pinConfigs![i].Value}");
-
-                    }
-                }
-            } else {
-                if (debugMode!.Value) Logger.LogInfo("(PlayerData.instance is null");
+                default:
+                case 0:
+                    OnConfigChangeAll(value, mapConfigs, ref allowChangeAllMaps, ref isChangingAllMaps);
+                    break;
+                case 1:
+                    OnConfigChangeAll(value, pinConfigs, ref allowChangeAllPins, ref isChangingAllPins);
+                    break;
             }
+                
         }
 
 
-        public void OnConfigChangedAllPins(bool value)
+        public void OnConfigChangeAll(bool value, ConfigEntry<bool>[] entries, ref bool allowChangeAll, ref bool isChangingAll)
         {
-            if (!allowChangeAllPins)
+            if (debugMode!.Value) Logger.LogInfo("allowChangeAll: "+allowChangeAll);
+            if (!allowChangeAll)
             {
-                allowChangeAllPins = true;
+                allowChangeAll = true;
                 return;
             }
-            string action = value ? "Unlocked" : "Locked";
 
             if (PlayerData.instance != null)
             {
-                isChangingAllPins = true;
-                if (debugMode!.Value) Logger.LogInfo(pinConfigs.GetCount() + " pinConfigs!");
-                if (debugMode!.Value) Logger.LogInfo(MapUnlocker.pinFields.GetCount() + " pinFields!");
-                for (int pin = 0; pin < MapUnlocker.pinFields.Length; pin++)
+                isChangingAll = true;
+                for (int entry = 0; entry < entries.Length; entry++)
                 {
-                    if (plugin.SetPlayerDataBool(PlayerData.instance, MapUnlocker.pinFields[pin], value))
-                    {
-                        pinConfigs![pin].Value = value;
-                        if (debugMode!.Value) Logger.LogInfo(MapUnlocker.pinFields[pin] + " has been " + action + "!");
-                    }
-                    else
-                    {
-                        if (debugMode!.Value) Logger.LogInfo(MapUnlocker.pinFields[pin] + " could not be " + action + "! Skipping map...");
-                    }
+                    entries[entry].Value = value;
                 }
             }
             else
@@ -321,11 +271,12 @@ namespace MapUnlocker
                 if (debugMode!.Value) Logger.LogInfo("PlayerData could not be found");
             }
 
-            isChangingAllPins = false;
+            isChangingAll = false;
         }
 
 
-        private void OnConfigChangedPin(string pinName, bool value)
+
+        private void OnConfigChange(string fieldName, bool value, ref bool allowChangeAll, ref bool isChangingAll, ref ConfigEntry<bool> unlockAllConfig)
         {
             // lock or unlocking string message purely for debugging purposes
             string action = value ? "Unlocked" : "Locked";
@@ -333,17 +284,61 @@ namespace MapUnlocker
             if (PlayerData.instance != null)
             {
                 // checks an logs if modifying the map data field was successful or not
-                if (plugin.SetPlayerDataBool(PlayerData.instance, pinName, value))
+                if (plugin.SetPlayerDataBool(PlayerData.instance, fieldName, value))
                 {
-                    if (!value) {
-                        plugin.SetPlayerDataBool(PlayerData.instance, MapUnlocker.pinFields[MapUnlocker.ALL_FIELDS], value);
-                        if (!isChangingAllPins) allowChangeAllPins = false;
-                        pinConfigs![MapUnlocker.ALL_FIELDS].Value = value;
+                    // change unlockAllConfig entry to false without triggering its onSettingChanged function
+                    if (!value)
+                    {
+                        if (debugMode!.Value) Logger.LogInfo("before isChangingAll: " + isChangingAll);
+
+                        if (!isChangingAll) allowChangeAll = false;
+
+                        if (debugMode.Value) Logger.LogInfo("after allowChangeAll: " + allowChangeAll);
+
+                        unlockAllConfig.Value = value;
                     }
-                    
-                } else {
-                    if (debugMode!.Value) Logger.LogInfo(pinName+" could not be "+action+"!");
+
                 }
+                else
+                {
+                    if (debugMode!.Value) Logger.LogInfo(fieldName + " could not be " + action + "!");
+                }
+            }
+        }
+        
+        private void OnConfigChange(FieldInfo fieldInfo, bool value, ref bool allowChangeAll, ref bool isChangingAll, ref ConfigEntry<bool> unlockAllConfig)
+        {
+            // lock or unlocking string message purely for debugging purposes
+            string action = value ? "Unlocked" : "Locked";
+
+            if (PlayerData.instance != null && fieldInfo != null)
+            {
+                // checks an logs if modifying the map data field was successful or not
+                if (fieldInfo.FieldType == typeof(bool))
+                {
+                    if (plugin.SetPlayerDataBool(fieldInfo, value))
+                    {
+                        // change unlockAllConfig entry to false without triggering its onSettingChanged function
+                        if (!value)
+                        {
+                            if (debugMode!.Value) Logger.LogInfo("before isChangingAll: " + isChangingAll);
+
+                            if (!isChangingAll) allowChangeAll = false;
+                            
+                            if (debugMode.Value) Logger.LogInfo("after allowChangeAll: "+ allowChangeAll);
+                            
+                            unlockAllConfig.Value = value;
+                        }
+                    }
+                    else
+                    {
+                        if (debugMode!.Value) Logger.LogInfo($"{fieldInfo.Name} could not be {action}!");
+                    }
+                }
+            }
+            else
+            {
+                if (debugMode!.Value) Logger.LogInfo($"FieldInfo is null or PlayerData.instance is null");
             }
         }
     }

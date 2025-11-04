@@ -4,45 +4,13 @@ A BepInEx mod for Hollow Knight: Silksong that allows you to unlock maps and con
 
 ## Features
 
-- **Individual Map Control**: Unlock specific maps individually or all maps at once
+- **Individual Map Control**: Unlock specific maps individually or all at once
+- **Individual Pin Control**: Unlock specific pins individually or all at once
 - **Quill Tool**: Enable/disable the quill tool for map drawing
-- **Auto-Unlock**: Option to unlock all maps automatically when starting a new game
-- **Map Reset**: Option to restore original map states when leaving the game
+- **Auto-Unlock**: Option to unlock all maps and pins automatically when starting a new game
+- **Map Reset**: Option to restore original map and pin states when leaving the game
 - **Debug Mode**: Detailed logging for troubleshooting
 - **Configurable**: All options available through BepInEx configuration menu
-
-## Supported Maps
-
-The mod supports unlocking maps for all major areas in Silksong:
-
-- Moss Grotto
-- Wilds
-- Bone Forest
-- Docks
-- Greymoor
-- Bellhart
-- Shellwood
-- Crawl
-- Hunters Nest
-- Judge Steps
-- Dustpens
-- Slab
-- Peak
-- Citadel Understore
-- Coral
-- Swamp
-- Clover
-- Abyss
-- Hang
-- SongGate
-- Halls
-- Ward
-- Cog
-- Library
-- Cradle
-- Arborium
-- Aqueduct
-- Weavehome
 
 ## Installation
 
@@ -63,8 +31,16 @@ The mod adds several configuration options accessible through the BepInEx config
 
 ### Individual Map Settings
 Each map area has its own toggle to unlock/lock that specific map:
-- **Unlock All Maps Now**: Master toggle for all maps
-- Individual toggles for each area (Moss Grotto, Wilds, etc.)
+- **Unlock All Maps Start**: Master toggle for all maps when you load into a save.
+- **Unlock All Maps Now**: Master toggle for all maps.
+- Individual toggles for each area (Moss Grotto, Wilds, etc.).
+
+
+### Individual Pin Settings
+Each Pin has its own toggle to unlock/lock that specific pin:
+- **Unlock All Pins Start**: Master toggle for all pins when you load into a save.
+- **Unlock All pins Now**: Master toggle for all maps.
+- Individual toggles for each pin (Bench, Stag, Shop, etc.).
 
 ## How It Works
 
@@ -101,6 +77,7 @@ This mod is provided as-is for educational and entertainment purposes. Please re
 
 ## Version History
 
+- **v1.1.2**: Optimizations.
 - **v1.1.1**: Map pin bug fixes.
 - **v1.1.0**: Map pin additions and config menu improvements.
 - **v1.0.0**: Initial release with full map unlocking functionality
