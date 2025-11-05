@@ -6,6 +6,7 @@ A BepInEx mod for Hollow Knight: Silksong that allows you to unlock maps and con
 
 - **Individual Map Control**: Unlock specific maps individually or all at once
 - **Individual Pin Control**: Unlock specific pins individually or all at once
+- **Individual Marker Control**: Unlock specific pins individually or all at once
 - **Quill Tool**: Enable/disable the quill tool for map drawing
 - **Auto-Unlock**: Option to unlock all maps and pins automatically when starting a new game
 - **Map Reset**: Option to restore original map and pin states when leaving the game
@@ -24,23 +25,17 @@ A BepInEx mod for Hollow Knight: Silksong that allows you to unlock maps and con
 The mod adds several configuration options accessible through the BepInEx configuration menu:
 
 ### General Settings
+
 - **Debug Mode**: Enable detailed logging for troubleshooting
 - **Reset Maps After Leaving**: Restore original map states when exiting the game
 - **Has Quill**: Enable/disable the quill tool for map drawing
-- **Unlock All Maps At Start**: Automatically unlock all maps when starting a new game
 
 ### Individual Map Settings
-Each map area has its own toggle to unlock/lock that specific map:
-- **Unlock All Maps Start**: Master toggle for all maps when you load into a save.
-- **Unlock All Maps Now**: Master toggle for all maps.
-- Individual toggles for each area (Moss Grotto, Wilds, etc.).
 
-
-### Individual Pin Settings
-Each Pin has its own toggle to unlock/lock that specific pin:
-- **Unlock All Pins Start**: Master toggle for all pins when you load into a save.
-- **Unlock All pins Now**: Master toggle for all maps.
-- Individual toggles for each pin (Bench, Stag, Shop, etc.).
+Each map, pin and marker has their own toggle to unlock/lock:
+- **Unlock All Start**: Each field has a master toggle for every item when you load into a save.
+- **Unlock All Now**: Each field has a Master toggle for every item under its category.
+- Individual toggles for each map, pin and marker.
 
 ## How It Works
 
@@ -77,6 +72,7 @@ This mod is provided as-is for educational and entertainment purposes. Please re
 
 ## Version History
 
+- **v1.2.0**: Map marker additions.
 - **v1.1.2**: Optimizations.
 - **v1.1.1**: Map pin bug fixes.
 - **v1.1.0**: Map pin additions and config menu improvements.

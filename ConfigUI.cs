@@ -39,12 +39,18 @@ namespace MapUnlocker
         public ConfigEntry<bool>? unlockAllPinsAtStart;
         public ConfigEntry<bool>? unlockAllPins;
         public ConfigEntry<bool>[]? pinConfigs;
+        public ConfigEntry<bool>? unlockAllMarkersAtStart;
+        public ConfigEntry<bool>? unlockAllMarkers;
+        public ConfigEntry<bool>[]? markerConfigs;
+
 
 
         private static bool allowChangeAllMaps = true;
         private static bool isChangingAllMaps = false;
         private static bool allowChangeAllPins = true;
         private static bool isChangingAllPins = false;
+        private static bool allowChangeAllMarkers = true;
+        private static bool isChangingAllMarkers = false;
 
         /*
         * InitializeConfig: initializes the configuration menu binds and ui while applying onClick functionality.
@@ -113,6 +119,19 @@ namespace MapUnlocker
                 Config.Bind("Pins", "Unlock the FleaMucklands Pin", false, "Unlock FleaMucklands Pin")
             }; 
 
+            unlockAllMarkersAtStart = Config.Bind("Markers", "Unlock All Markers At Start", false, "Unlock All Markers At the Start");
+
+            unlockAllMarkers = Config.Bind("Markers", "Unlock All Markers Now", false, "Unlock All Markers");
+
+            // Config entries for each pin
+            markerConfigs = new ConfigEntry<bool>[] {
+                Config.Bind("Markers", "Unlock the hasMarker_a", false, "Unlock hasMarker_a"),
+                Config.Bind("Markers", "Unlock the hasMarker_b", false, "Unlock hasMarker_b"),
+                Config.Bind("Markers", "Unlock the hasMarker_c", false, "Unlock hasMarker_c"),
+                Config.Bind("Markers", "Unlock the hasMarker_d", false, "Unlock hasMarker_d"),
+                Config.Bind("Markers", "Unlock the hasMarker_e", false, "Unlock hasMarker_e")
+            }; 
+
             // Add this line to explicitly create the config file
             Config.Save();
 
@@ -126,11 +145,10 @@ namespace MapUnlocker
 
             hasQuill.SettingChanged += (sender, args) => plugin.changeQuillBool(hasQuill.Value);
 
-            // apply 'unlock/lock all maps' to onClick/onConfigChanged functionalty to all maps config.
-            unlockAllMaps.SettingChanged += (sender, args) => OnConfigChangeAll(unlockAllMaps.Value, 0);
-
-            // apply 'unlock/lock all pin' to onClick/onConfigChanged functionalty to all pins config.
-            unlockAllPins.SettingChanged += (sender, args) => OnConfigChangeAll(unlockAllPins.Value, 1);
+            // apply 'unlock/lock all' to onClick/onConfigChanged functionalty.
+            unlockAllMaps.SettingChanged += (sender, args) => OnConfigChangeAll(unlockAllMaps.Value, MapUnlocker.MAPS);
+            unlockAllPins.SettingChanged += (sender, args) => OnConfigChangeAll(unlockAllPins.Value, MapUnlocker.PINS);
+            unlockAllMarkers.SettingChanged += (sender, args) => OnConfigChangeAll(unlockAllMarkers.Value, MapUnlocker.MARKERS);
 
             // applies 'unlock/lock map' to onClick/onConfigChanged functionalty to all map configs.
             for (int map = 1; map < mapConfigs.Length; map++)
@@ -157,9 +175,9 @@ namespace MapUnlocker
                     }
                 };
             }
-            
+
             // applies 'unlock/lock pin' to onClick/onConfigChanged functionalty to all pin configs.
-            for (int pin = 0; pin < pinConfigs.Length; pin++) 
+            for (int pin = 0; pin < pinConfigs.Length; pin++)
             {
                 int currentPin = pin;
                 pinConfigs[currentPin].SettingChanged += (sender, args) => OnConfigChange
@@ -170,6 +188,40 @@ namespace MapUnlocker
                     ref isChangingAllPins,
                     ref unlockAllPins
                 );
+            }
+            
+            // applies 'unlock/lock pin' to onClick/onConfigChanged functionalty to all pin configs.
+            for (int marker = 0; marker < markerConfigs.Length; marker++) 
+            {
+                int currentMarker = marker;
+                markerConfigs[currentMarker].SettingChanged += (sender, args) =>
+                {
+                    OnConfigChange
+                    (
+                        MapUnlocker.playerDataFieldsBools[MapUnlocker.MARKERS][currentMarker+1],
+                        markerConfigs[currentMarker].Value,
+                        ref allowChangeAllMarkers,
+                        ref isChangingAllMarkers,
+                        ref unlockAllMarkers
+                    );
+
+                    var hasMarkerField = MapUnlocker.GetPlayerDataBoolValue(MapUnlocker.playerDataFieldsBools[MapUnlocker.MARKERS][0]);
+                    if (hasMarkerField != null)
+                    {
+                        if (markerConfigs[currentMarker].Value && hasMarkerField == false)
+                        {
+                            plugin.SetPlayerDataBool
+                            (
+                                MapUnlocker.playerDataFieldsBools[MapUnlocker.MARKERS][0],
+                                true
+                            );
+                        }
+                    } else
+                    {
+                        Logger.LogError("hasMarkerField is null!");
+                    }
+                    
+                };
             }
 
             if (debugMode!.Value) Logger.LogInfo($"Configuration initialized with {mapConfigs!.Length} map configs");
@@ -243,6 +295,9 @@ namespace MapUnlocker
                     break;
                 case 1:
                     OnConfigChangeAll(value, pinConfigs, ref allowChangeAllPins, ref isChangingAllPins);
+                    break;
+                case 2:
+                    OnConfigChangeAll(value, markerConfigs, ref allowChangeAllMarkers, ref isChangingAllMarkers);
                     break;
             }
                 

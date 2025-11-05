@@ -27,6 +27,8 @@ namespace MapUnlocker
         public static bool[] moddedMapData = new bool[MapUnlocker.mapFields.Length];
         public static bool[] originalPinData = new bool[MapUnlocker.pinFields.Length];
         public static bool[] moddedPinData = new bool[MapUnlocker.pinFields.Length];
+        public static bool[] originalMarkerData = new bool[MapUnlocker.pinFields.Length];
+        public static bool[] moddedMarkerData = new bool[MapUnlocker.pinFields.Length];
 
         public ResetManager(BepInEx.Logging.ManualLogSource logger, MapUnlocker plugin)
         {
@@ -171,6 +173,7 @@ namespace MapUnlocker
             {
                 StoreBoolData(originalMapData, MapUnlocker.playerDataFieldsBools[MapUnlocker.MAPS]);
                 StoreBoolData(originalPinData, MapUnlocker.playerDataFieldsBools[MapUnlocker.PINS]);
+                StoreBoolData(originalMarkerData, MapUnlocker.playerDataFieldsBools[MapUnlocker.MARKERS]);
             }
             else
             {
@@ -209,11 +212,15 @@ namespace MapUnlocker
                 {
                     plugin.resetManager.StoreBoolData(moddedMapData, MapUnlocker.playerDataFieldsBools[MapUnlocker.MAPS]);
                     plugin.resetManager.StoreBoolData(moddedPinData, MapUnlocker.playerDataFieldsBools[MapUnlocker.PINS]);
+                    plugin.resetManager.StoreBoolData(moddedMarkerData, MapUnlocker.playerDataFieldsBools[MapUnlocker.MARKERS]);
 
                     if (plugin.configUI?.debugMode.Value == true) plugin.DebugArrayContents("originalMapData", originalMapData);
+                    if (plugin.configUI?.debugMode.Value == true) plugin.DebugArrayContents("originalPinData", originalPinData);
+                    if (plugin.configUI?.debugMode.Value == true) plugin.DebugArrayContents("originalMarkerData", originalMarkerData);
 
                     plugin.resetManager.OverwriteBoolData(originalMapData, MapUnlocker.playerDataFieldsBools[MapUnlocker.MAPS]);
                     plugin.resetManager.OverwriteBoolData(originalPinData, MapUnlocker.playerDataFieldsBools[MapUnlocker.PINS]);
+                    plugin.resetManager.OverwriteBoolData(originalMarkerData, MapUnlocker.playerDataFieldsBools[MapUnlocker.MARKERS]);
 
                     plugin.Logger.LogInfo("Restored original map states before SaveGameData constructor");
                 }
@@ -230,7 +237,8 @@ namespace MapUnlocker
                 {
                     plugin.resetManager.OverwriteBoolData(moddedMapData, MapUnlocker.playerDataFieldsBools[MapUnlocker.MAPS]);
                     plugin.resetManager.OverwriteBoolData(moddedPinData, MapUnlocker.playerDataFieldsBools[MapUnlocker.PINS]);
-                    
+                    plugin.resetManager.OverwriteBoolData(moddedMarkerData, MapUnlocker.playerDataFieldsBools[MapUnlocker.MARKERS]);
+
                     plugin.Logger.LogInfo("Re-applied mod states after SaveGameData constructor");
                 }
             }

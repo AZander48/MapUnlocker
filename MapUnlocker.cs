@@ -30,6 +30,7 @@ public class MapUnlocker : BaseUnityPlugin
     public static readonly int ALL_FIELDS = 0;
     public static readonly int MAPS = 0;
     public static readonly int PINS = 1;
+    public static readonly int MARKERS = 2;
 
     // Manager instances
     public ResetManager resetManager = null!;
@@ -86,6 +87,16 @@ public class MapUnlocker : BaseUnityPlugin
         "hasPinFleaMucklands"
     };
 
+    public static readonly string[] markerFields =
+    {
+        "hasMarker",
+        "hasMarker_a",
+        "hasMarker_b",
+        "hasMarker_c",
+        "hasMarker_d",
+        "hasMarker_e"
+    };
+
     // FieldInfo objects to reference PlayerData fields dynamically
     public static readonly FieldInfo[][] playerDataFieldsBools =
     [
@@ -93,6 +104,9 @@ public class MapUnlocker : BaseUnityPlugin
             typeof(PlayerData).GetField(fieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
         ).ToArray(),
         pinFields.Select(fieldName => 
+            typeof(PlayerData).GetField(fieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+        ).ToArray(),
+        markerFields.Select(fieldName => 
             typeof(PlayerData).GetField(fieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
         ).ToArray()
     ];

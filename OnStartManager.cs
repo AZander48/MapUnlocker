@@ -54,7 +54,7 @@ namespace MapUnlocker
                     if (plugin.configUI.unlockAllMapsAtStart?.Value == true)
                     {
                         plugin.configUI.unlockAllMaps.Value = true;
-                        if (debugMode) plugin.Logger.LogInfo("UnlockAtStart finished.");
+                        if (debugMode) plugin.Logger.LogInfo("UnlockAtStart unlockAllMaps finished.");
                     }
                     // enables all maps already unlocked based on playerData map data
                     else
@@ -67,12 +67,25 @@ namespace MapUnlocker
                     if (plugin.configUI.unlockAllPinsAtStart?.Value == true)
                     {
                         plugin.configUI.unlockAllPins.Value = true;
-                        if (debugMode) plugin.Logger.LogInfo("UnlockAtStart finished.");
+                        if (debugMode) plugin.Logger.LogInfo("UnlockAtStart unlockAllPins finished.");
                     }
                     // enables all pins already unlocked based on playerData pin data
                     else
                     {
-                        plugin.configUI.ChangeConfigData(plugin.configUI.pinConfigs, MapUnlocker.playerDataFieldsBools[MapUnlocker.MAPS]);
+                        plugin.configUI.ChangeConfigData(plugin.configUI.pinConfigs, MapUnlocker.playerDataFieldsBools[MapUnlocker.PINS]);
+                        if (debugMode) plugin.Logger.LogInfo("Stored config data from HeroController_Start");
+                    }
+
+                    // unlocks all pins at the start 
+                    if (plugin.configUI.unlockAllMarkersAtStart?.Value == true)
+                    {
+                        plugin.configUI.unlockAllMarkers.Value = true;
+                        if (debugMode) plugin.Logger.LogInfo("UnlockAtStart unlockAllMarkers finished.");
+                    }
+                    // enables all pins already unlocked based on playerData pin data
+                    else
+                    {
+                        plugin.configUI.ChangeConfigData(plugin.configUI.markerConfigs, MapUnlocker.playerDataFieldsBools[MapUnlocker.MARKERS]);
                         if (debugMode) plugin.Logger.LogInfo("Stored config data from HeroController_Start");
                     }
 
